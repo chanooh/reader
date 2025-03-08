@@ -20,7 +20,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.chanooh.reader"
     },
     "web": {
       "bundler": "metro",
@@ -32,6 +33,15 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "2b471918-a518-4cd7-8823-b64d43a0f6e0"
+      }
+    },
+    "owner": "chanooh"
   }
 }
