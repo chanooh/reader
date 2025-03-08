@@ -9,14 +9,14 @@ import {
 } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { Link, useRouter } from 'expo-router';
-import { useAuth } from '@/context/AuthContext';
+// import { useAuth } from '@/context/AuthContext';
 export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
-  const { login } = useAuth();
+  // const { login } = useAuth();
   const handleRegister = async () => {
     setLoading(true);
     setError('');
@@ -35,7 +35,7 @@ export default function RegisterScreen() {
       if (!response.ok) {
         throw new Error(data.message || '注册失败');
       }
-      await login(data.token);
+      // await login(data.token);
       router.replace('/login');
     } catch (err:any) {
       setError(err.message);

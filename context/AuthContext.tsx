@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUser = useCallback(async (token: string) => {
     try {
-      const response = await fetch('http://your-api/user/me', {
+      const response = await fetch('http://127.0.0.1/api/me', {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -54,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (newToken: string) => {
     try {
+      console.log(newToken)
       await AsyncStorage.setItem('token', newToken);
       setToken(newToken);
       

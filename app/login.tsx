@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   StyleSheet, 
   TextInput, 
@@ -9,14 +9,27 @@ import {
 } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { Link, useRouter } from 'expo-router';
-import { useAuth } from '@/context/AuthContext';
+// import { useAuth } from '@/context/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+interface User {
+  id: string;
+  username: string;
+  avatar_url: string;
+}
+
+
+
+
 export default function LoginScreen() {
   const [username, setusername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const router = useRouter();
-  const { login } = useAuth();
+  // const { login } = useAuth();
   const handleLogin = async () => {
     
     setLoading(true);
@@ -36,7 +49,21 @@ export default function LoginScreen() {
       if (!response.ok) {
         throw new Error(data.message || '登录失败');
       }
-      await login(data.token);
+      // await login(data.token);
+      const token = data.token
+
+      await AsyncStorage.setItem('token', token);
+
+
+      const userDataResponse = await fetch('http://192.168.111.30:3000/api/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const userData = await userDataResponse.json();
+      await AsyncStorage.setItem('userData', JSON.stringify(userData));
+
+      const savedToken = await AsyncStorage.getItem('token');
+    
+
       router.replace('/');
     } catch (err:any) {
       setError(err.message);

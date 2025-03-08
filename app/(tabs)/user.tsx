@@ -1,35 +1,58 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { View, Text } from '@/components/Themed';
 import { Link, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '@/context/AuthContext';
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+interface User {
+  id: string;
+  username: string;
+  avatar_url: string;
+}
+
  
 export default function UserScreen() {
-  const {  logout, isInitializing } = useAuth();
+
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const router = useRouter();
-  const user = { username: 'chen', avatar_url: 'https://himg.bdimg.com/sys/portrait/item/public.1.b7e54a35.JBby_NyG1Pvx9JhMU-eQWA.jpg'}
-  const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImlhdCI6MTc0MTMyODc5MiwiZXhwIjoxNzQxOTMzNTkyfQ.jNVUwLepsibWcghiTUmibpcuEo9HW6l5w6C1wQdxVv8'
-  // 处理认证状态变化
+
+  const getStorage = async () => {
+    const token = await AsyncStorage.getItem('token') ?? ''; 
+    console.log(token)
+    const userData = await AsyncStorage.getItem('userData') ?? ''; 
+    const userDataJson = JSON.parse(userData); 
+    setToken(token);
+    setUser(userDataJson);
+  };
+
   useEffect(() => {
-    // console.log(user,token)
-    if (!isInitializing && !token) {
-      router.replace('/login');
-    }
-  }, [token, isInitializing]);
- 
-  // // 显示初始化加载状态
-  // if (isInitializing) {
-  //   return (
-  //     <View style={styles.loadingContainer}>
-  //       <ActivityIndicator size="large" color="#3B82F6" />
-  //     </View>
-  //   );
-  // }
- 
+    const checkAuth = async () => {
+      const storedToken = await AsyncStorage.getItem('token');
+      const storedUser = await AsyncStorage.getItem('userData');
+  
+      if (!storedToken) {
+        router.replace('/login');
+        return;
+      }
+  
+      // 更新状态
+      setToken(storedToken);
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
+    };
+  
+    checkAuth();
+  }, []);
+
   // 处理退出登录
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    // logout();
+    await AsyncStorage.removeItem('token');
+    await AsyncStorage.removeItem('userData');
     router.replace('/login');
   };
  
