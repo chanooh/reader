@@ -9,13 +9,14 @@ import {
 } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { Link, useLocalSearchParams } from 'expo-router';
- 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 interface Book {
   bookId: string;
   title: string;
   author: string;
   cover: string;
-  progress: number; // 0-1之间的进度值
+  progress: number;
+  status: 0 | 1;
 }
  
 export default function CollectionScreen() {
@@ -23,19 +24,36 @@ export default function CollectionScreen() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  // 获取用户token
+  useEffect(() => {
+    const loadToken = async () => {
+      const storedToken = await AsyncStorage.getItem('token');
+      setToken(storedToken);
+    };
+    loadToken();
+  }, []);
  
+  // 获取书籍数据
   useEffect(() => {
     const fetchBooks = async () => {
       try {
+        if (!token) return;
+ 
         const response = await fetch(
-          `http://192.168.111.30:3000/api/collections/${collectionId}/books`
+          `http://192.168.111.30:3000/api/collections/${collectionId}/books`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
         );
         
         if (!response.ok) throw new Error('请求失败');
         
         const data = await response.json();
         setBooks(data);
-      } catch (err:any) {
+      } catch (err: any) {
         setError(err.message);
         Alert.alert('错误', '无法获取书籍数据');
       } finally {
@@ -43,8 +61,38 @@ export default function CollectionScreen() {
       }
     };
  
-    fetchBooks();
-  }, [collectionId]);
+    if (token) fetchBooks();
+  }, [collectionId, token]);
+
+   // 处理书架状态切换
+   const handleToggleShelf = async (bookId: string, currentStatus: 0 | 1) => {
+    try {
+      const endpoint = currentStatus === 1 ? 'remove' : 'add';
+      const response = await fetch(
+        `http://192.168.111.30:3000/api/user_books/${bookId}`,
+        {
+          method: currentStatus === 1 ? 'DELETE' : 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+ 
+      if (!response.ok) throw new Error('操作失败');
+ 
+      // 更新本地状态
+      setBooks(prevBooks => 
+        prevBooks.map(book => 
+          book.bookId === bookId 
+            ? { ...book, status: currentStatus === 1 ? 0 : 1 } 
+            : book
+        )
+      );
+    } catch (error) {
+      Alert.alert('错误', '操作失败，请重试');
+    }
+  };
  
   if (loading) {
     return (
@@ -96,9 +144,15 @@ export default function CollectionScreen() {
                 </View>
               </View>
  
-              <View style={styles.joinTag}>
-                <Text style={styles.joinText}>加入书架</Text>
-              </View>
+              <TouchableOpacity
+                style={[styles.joinTag]}
+                onPress={() => handleToggleShelf(item.bookId, item.status)}  
+              >
+
+                 <View  style={[styles.joinButton, item.status === 1 && styles.removeButton]}>
+                  <Text style={[styles.joinText, item.status === 1 && styles.removeText]}> {item.status === 1 ? '移出书架' : '加入书架'}</Text>
+                </View>
+              </TouchableOpacity>
             </TouchableOpacity>
           </Link>
         )}
@@ -186,14 +240,27 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 12,
     right: 12,
+  },
+  joinButton:{
     backgroundColor: '#c6f6d5',
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  removeButton: {
+    backgroundColor: '#778899',
+    paddingHorizontal: 6,
     paddingVertical: 4,
     borderRadius: 4,
   },
   joinText: {
     fontSize: 12,
     color: '#22543d',
+    fontWeight: '500',
+  },
+  removeText: {
+    fontSize: 12,
+    color: 'white',
     fontWeight: '500',
   },
   emptyText: {
@@ -230,5 +297,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.9)' // 半透明白色叠加层
-  }
+  },
+
 });

@@ -1,74 +1,176 @@
-import React from 'react';
-import { StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+import React,  { useEffect, useState, useCallback } from 'react';
+import { 
+  StyleSheet, 
+  FlatList, 
+  TouchableOpacity, 
+  Image,
+  ActivityIndicator,
+  Alert
+} from 'react-native';
 import { Text, View } from '@/components/Themed';
-import { Link } from 'expo-router';
-
-const bookshelf = [
-  { bookId: '6', title: '朝花夕拾', author: '鲁迅', cover: 'https://pic.arkread.com/cover/ebook/f/434328855.1686022830.jpg!cover_default.jpg' },
-  { bookId: '7', title: '骆驼祥子', author: '老舍', cover: 'https://pic.arkread.com/cover/ebook/f/434328855.1686022830.jpg!cover_default.jpg' },
-  { bookId: '8', title: '藤野先生', author: '鲁迅', cover: 'https://pic.arkread.com/cover/ebook/f/434328855.1686022830.jpg!cover_default.jpg' },
-  { bookId: '1', title: '钢铁是怎样炼成的', author: '尼古拉·奥斯特洛夫斯基', cover: 'https://pic.arkread.com/cover/ebook/f/434328855.1686022830.jpg!cover_default.jpg' },
-  { bookId: '2', title: '祝福', author: '鲁迅', cover: 'https://pic.arkread.com/cover/ebook/f/434328855.1686022830.jpg!cover_default.jpg' },
-];;
-
+import { Link, useRouter,useFocusEffect  } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+ 
+interface Book {
+  bookId: string;
+  title: string;
+  author: string;
+  cover: string;
+  progress: number;
+}
+ 
 export default function BookScreen() {
-  // const handleBookPress = (book: any) => {
-  //   console.log('Book pressed:', book.title);
-  // };
+  const router = useRouter();
+  const [books, setBooks] = useState<Book[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
 
-  // 模拟阅读进度
-  const getProgress: any = () => Math.random().toFixed(2);
-
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const storedToken = await AsyncStorage.getItem('token');
+      
+      if (!storedToken) {
+        router.replace('/login');
+        return;
+      }
+ 
+      const response = await fetch(
+        'http://192.168.111.30:3000/api/user_books',
+        { headers: { Authorization: `Bearer ${storedToken}` } }
+      );
+ 
+      if (!response.ok) throw new Error('请求失败');
+      setBooks(await response.json());
+      setError(null);
+    } catch (err: any) {
+      setError(err.message);
+      Alert.alert('错误', '获取书架数据失败');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+ 
+  // 认证检查 & 获取数据
+  useFocusEffect(
+    useCallback(() => {
+      fetchData();
+      
+      // 可选：清理函数（如果需要取消请求）
+      return () => {
+        // 这里可以添加请求中止逻辑
+      };
+    }, [fetchData])
+  );
+ 
+ 
+  // 移出书架操作
+  const handleRemoveBook = async (bookId: string) => {
+    try {
+      const storedToken = await AsyncStorage.getItem('token');
+      if (!storedToken) return;
+ 
+      const response = await fetch(
+        `http://192.168.111.30:3000/api/user_books/${bookId}`,
+        { method: 'DELETE', headers: { Authorization: `Bearer ${storedToken}`, } }
+      );
+ 
+      if (!response.ok) throw new Error('操作失败');
+      
+      // 修改：重新获取最新数据而不是本地过滤
+      await fetchData();
+      Alert.alert('成功', '已移出书架');
+    } catch (error) {
+      Alert.alert('错误', '操作失败，请重试');
+    }
+  };
+ 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>加载中...</Text>
+      </View>
+    );
+  }
+ 
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => router.replace('/book')}
+        >
+          <Text style={styles.retryText}>点击重试</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+ 
   return (
     <View style={styles.container}>
-      {/* <Text style={styles.headerTitle}>📖 我的书架</Text> */}
       <FlatList
-        data={bookshelf}
+        data={books}
         keyExtractor={(item) => item.bookId}
         renderItem={({ item }) => (
-          <Link
-          href={{
-            pathname: '/reader',
-            params: { collectionId: item.bookId }
-            }}
-            asChild>
-          <TouchableOpacity 
-            style={styles.bookCard}
-            activeOpacity={0.8}
-          >
-            <Image 
-              source={{ uri: item.cover }} 
-              style={styles.coverImage}
-              resizeMode="cover"
-            />
-            
-            <View style={styles.bookInfo}>
-              <Text style={styles.bookTitle} numberOfLines={1}>{item.title}</Text>
-              <Text style={styles.bookAuthor}>{item.author}</Text>
-              
-              {/* 阅读进度条 */}
-              <View style={styles.progressContainer}>
-                <View style={[styles.progressBar, { width: `${getProgress() * 100}%` }]} />
-                <Text style={styles.progressText}>
-                  {`已阅读 ${(getProgress() * 100).toFixed(0)}%`}
-                </Text>
-              </View>
-            </View>
 
-            {/* 右上角分类标签 */}
-            <View style={styles.removeTag}>
-              <Text style={styles.removeText}>移出书架</Text>
-            </View>
-          </TouchableOpacity>
-          </Link>
+            <Link
+              href={{
+                pathname: '/reader',
+                params: { bookId: item.bookId }
+              }}
+              asChild
+            >
+              <TouchableOpacity style={styles.bookCard} activeOpacity={0.8}>
+                <Image 
+                  source={{ uri: item.cover }} 
+                  style={styles.coverImage}
+                  resizeMode="cover"
+                />
+                
+                <View style={styles.bookInfo}>
+                  <Text style={styles.bookTitle} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.bookAuthor}>{item.author}</Text>
+                  
+                  <View style={styles.progressContainer}>
+                    <View style={[styles.progressBar, { 
+                      width: `${item.progress * 100}%` 
+                    }]} />
+                    <Text style={styles.progressText}>
+                      {`已阅读 ${(item.progress * 100).toFixed(0)}%`}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                style={[styles.removeTag]}
+                onPress={() => handleRemoveBook(item.bookId)}
+              >
+
+                 <View  style={styles.removeButton}>
+                  <Text style={styles.removeText}>移出书架</Text>
+                </View>
+              </TouchableOpacity>
+              </TouchableOpacity>
+            </Link>
+
 
         )}
         contentContainerStyle={styles.bookList}
-        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>书架空空如也</Text>
+            <Text style={styles.emptySubText}>快去添加喜欢的书籍吧</Text>
+          </View>
+        }
       />
     </View>
   );
 }
+ 
 
 const styles = StyleSheet.create({
   container: {
@@ -142,18 +244,71 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#718096',
   },
-  removeTag: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: '#c6f6d5',
-    paddingHorizontal: 8,
+
+
+  bookContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  removeButton: {
+    backgroundColor: '#778899',
+    paddingHorizontal: 6,
     paddingVertical: 4,
     borderRadius: 4,
   },
   removeText: {
     fontSize: 12,
-    color: '#22543d',
+    color: 'white',
     fontWeight: '500',
   },
+
+  removeTag: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 8,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 16,
+    marginBottom: 12,
+  },
+  retryButton: {
+    padding: 12,
+    backgroundColor: '#007AFF',
+    borderRadius: 6,
+  },
+  retryText: {
+    color: 'white',
+    fontSize: 14,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    marginTop: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
+  },
+
 });
