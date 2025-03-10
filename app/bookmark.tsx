@@ -1,166 +1,189 @@
-import React from 'react';
-import { StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+// app/bookmarks.tsx
+import React, { useState, useCallback } from 'react';
+import { 
+  StyleSheet, 
+  FlatList, 
+  TouchableOpacity, 
+  Image,
+  ActivityIndicator,
+  Alert
+} from 'react-native';
 import { Text, View } from '@/components/Themed';
-import { Link } from 'expo-router';
+import { Link, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+// import dayjs from 'dayjs';
 
-const bookshelf = [
-  { bookId: '6', title: '朝花夕拾', author: '鲁迅', cover: 'https://pic.arkread.com/cover/ebook/f/434328855.1686022830.jpg!cover_default.jpg' },
-  { bookId: '7', title: '骆驼祥子', author: '老舍', cover: 'https://pic.arkread.com/cover/ebook/f/434328855.1686022830.jpg!cover_default.jpg' },
-  { bookId: '8', title: '藤野先生', author: '鲁迅', cover: 'https://pic.arkread.com/cover/ebook/f/434328855.1686022830.jpg!cover_default.jpg' },
-  { bookId: '1', title: '钢铁是怎样炼成的', author: '尼古拉·奥斯特洛夫斯基', cover: 'https://pic.arkread.com/cover/ebook/f/434328855.1686022830.jpg!cover_default.jpg' },
-  { bookId: '2', title: '祝福', author: '鲁迅', cover: 'https://pic.arkread.com/cover/ebook/f/434328855.1686022830.jpg!cover_default.jpg' },
-];;
+interface Bookmark {
+  bookmark_id: string;
+  book_id: string;
+  chapter_id: string;
+  created_at: string;
+  book_title: string;
+  chapter_title: string;
+  cover_url: string;
+}
 
 export default function BookmarkScreen() {
-  // const handleBookPress = (book: any) => {
-  //   console.log('Book pressed:', book.title);
-  // };
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // 模拟阅读进度
-  const getProgress: any = () => Math.random().toFixed(2);
+  const fetchBookmarks = useCallback(async () => {
+    try {
+      setLoading(true);
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch('http://127.0.0.1:3000/bookmarks', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!response.ok) throw new Error('获取书签失败');
+      const data = await response.json();
+      setBookmarks(data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const deleteBookmark = async (bookmarkId: string) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch(`http://127.0.0.1:3000/bookmarks/${bookmarkId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!response.ok) throw new Error('删除失败');
+      setBookmarks(prev => prev.filter(b => b.bookmark_id !== bookmarkId));
+      Alert.alert('成功', '书签已删除');
+    } catch (error) {
+      Alert.alert('错误', '删除失败，请重试');
+    }
+  };
+
+  useFocusEffect(useCallback(() => {
+    fetchBookmarks();
+  }, []));
+
+  // ...保持加载和错误状态渲染不变
 
   return (
     <View style={styles.container}>
-      {/* <Text style={styles.headerTitle}>📖 我的书架</Text> */}
       <FlatList
-        data={bookshelf}
-        keyExtractor={(item) => item.bookId}
+        data={bookmarks}
+        keyExtractor={item => item.bookmark_id}
         renderItem={({ item }) => (
-          <Link
-          href={{
-            pathname: '/reader',
-            params: { collectionId: item.bookId }
-            }}
-            asChild>
-          <TouchableOpacity 
-            style={styles.bookCard}
-            activeOpacity={0.8}
-          >
-            <Image 
-              source={{ uri: item.cover }} 
-              style={styles.coverImage}
-              resizeMode="cover"
-            />
-            
-            <View style={styles.bookInfo}>
-              <Text style={styles.bookTitle} numberOfLines={1}>{item.title}</Text>
-              <Text style={styles.bookAuthor}>{item.author}</Text>
-              
-              {/* 阅读进度条 */}
-              <View style={styles.progressContainer}>
-                <View style={[styles.progressBar, { width: `${getProgress() * 100}%` }]} />
-                <Text style={styles.progressText}>
-                  {`已阅读 ${(getProgress() * 100).toFixed(0)}%`}
-                </Text>
-              </View>
-            </View>
+          <View style={styles.bookmarkCard}>
+            <Link
+              href={{
+                pathname: '/reader',
+                params: { 
+                  bookId: item.book_id,
+                  chapterId: item.chapter_id
+                }
+              }}
+              asChild
+            >
+              <TouchableOpacity style={styles.content}>
+                <Image
+                  source={{ uri: item.cover_url }}
+                  style={styles.cover}
+                />
+                <View style={styles.info}>
+                  <Text style={styles.bookTitle}>{item.book_title}</Text>
+                  <Text style={styles.chapterTitle}>{item.chapter_title}</Text>
+                  {/* <Text style={styles.time}>
+                    {dayjs(item.created_at).format('YYYY-MM-DD HH:mm')}
+                  </Text> */}
+                </View>
+              </TouchableOpacity>
+            </Link>
 
-            {/* 右上角分类标签 */}
-            <View style={styles.categoryTag}>
-            <Text style={[styles.icon, styles.bookmarked]}>🔖</Text>
-            </View>
-          </TouchableOpacity>
-          </Link>
-
+            <TouchableOpacity 
+              style={styles.deleteButton}
+              onPress={() => deleteBookmark(item.bookmark_id)}
+            >
+              <Text style={styles.deleteText}>删除</Text>
+            </TouchableOpacity>
+          </View>
         )}
-        contentContainerStyle={styles.bookList}
-        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>暂无书签记录</Text>
+            <Text style={styles.emptyHint}>在章节页面长按添加书签</Text>
+          </View>
+        }
       />
     </View>
   );
 }
 
+// 样式表调整
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#f8f9fa',
+    padding: 16,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#2c3e50',
-    marginVertical: 24,
-    marginLeft: 8,
-    letterSpacing: 0.8,
-  },
-  bookList: {
-    paddingBottom: 40,
-  },
-  bookCard: {
+  bookmarkCard: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    padding: 16,
-    marginBottom: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    // 阴影效果
-    shadowColor: '#4a5568',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 5,
-  },
-  coverImage: {
-    width: 80,
-    height: 120,
     borderRadius: 8,
-    marginRight: 16,
-    // 封面装饰边框
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    marginBottom: 12,
+    padding: 16,
+    elevation: 2,
   },
-  bookInfo: {
+  content: {
     flex: 1,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cover: {
+    width: 50,
+    height: 70,
+    borderRadius: 4,
+    marginRight: 12,
+  },
+  info: {
+    flex: 1,
   },
   bookTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#2d3748',
-    marginBottom: 6,
-    maxWidth: '90%',
-  },
-  bookAuthor: {
-    fontSize: 14,
-    color: '#718096',
-    marginBottom: 12,
-  },
-  progressContainer: {
-    height: 4,
-    backgroundColor: '#e2e8f0',
-    borderRadius: 2,
-    overflow: 'hidden',
     marginBottom: 4,
   },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#48bb78',
-    borderRadius: 2,
+  chapterTitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
   },
-  progressText: {
+  time: {
     fontSize: 12,
-    color: '#718096',
+    color: '#999',
   },
-  categoryTag: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    // backgroundColor: '#c6f6d5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+  deleteButton: {
+    justifyContent: 'center',
+    paddingLeft: 16,
   },
-  categoryText: {
-    fontSize: 12,
-    color: '#22543d',
+  deleteText: {
+    color: '#ff4444',
     fontWeight: '500',
   },
-  icon: {
-    fontSize: 15,
-    color: '#000',
+  empty: {
+    alignItems: 'center',
+    marginTop: 40,
   },
-  bookmarked: {
-    color: '#FFD700',
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  emptyHint: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
   },
 });

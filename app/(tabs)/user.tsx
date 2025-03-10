@@ -55,7 +55,9 @@ export default function UserScreen() {
     await AsyncStorage.removeItem('userData');
     router.replace('/login');
   };
- 
+ const handleBookmark = async () => {
+  router.push('/bookmark');
+ }
   return (
     <View style={styles.container}>
       {/* 个人信息卡片 */}
@@ -86,12 +88,15 @@ export default function UserScreen() {
       {/* 功能列表 */}
       <View style={styles.listContainer}>
         <View style={styles.listGroup}>
+          {/* <Link href="/bookmark" asChild>
+
+          </Link> */}
           <ListItem 
-            icon="bookmark" 
-            label="我的书签" 
-            href="/bookmark" 
-            color="#FFA726"
-          />
+              icon="bookmark" 
+              label="我的书签"  
+              onPress={handleBookmark} 
+              color="#FFA726"
+            />
           <ListItem 
             icon="log-out" 
             label="退出登录" 
