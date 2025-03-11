@@ -27,10 +27,20 @@ export default function BookReaderScreen() {
   const [pendingRequests, setPendingRequests] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
-  const { bookId } = useLocalSearchParams();
+  const { bookId, chapterNumber: paramChapter } = useLocalSearchParams();
+  const initialChapter = paramChapter ? parseInt(paramChapter as string, 10) : null;
+ 
+  // 初始化章节状态
+  useEffect(() => {
+    if (initialChapter) {
+      setCurrentChapterIndex(initialChapter - 1);
+      // 预初始化数组长度确保能滚动到指定位置
+      setChapters(prev => [...prev, ...Array(initialChapter - prev.length).fill(undefined)]);
+    }
+  }, [initialChapter]);
  
   const fetchChapter = async (chapterNumber: number) => {
-    if (!hasMoreChapters || chapters[chapterNumber - 1]) return;
+    if (chapterNumber < 1 || !hasMoreChapters || chapters[chapterNumber - 1]) return;
  
     try {
       setPendingRequests(prev => prev + 1);
@@ -56,23 +66,53 @@ export default function BookReaderScreen() {
     }
   };
  
+  // 初始加载逻辑
   useEffect(() => {
-    fetchChapter(1);
-    fetchChapter(2);
-  }, []);
+    if (!bookId) return;
+ 
+    const loadInitialChapters = () => {
+      if (initialChapter) {
+        // 加载当前章节及前后章节
+        fetchChapter(initialChapter - 1);
+        fetchChapter(initialChapter);
+        fetchChapter(initialChapter + 1);
+      } else {
+        // 默认加载前两章
+        fetchChapter(1);
+        fetchChapter(2);
+      }
+    };
+ 
+    loadInitialChapters();
+  }, [bookId, initialChapter]);
  
   const handleScrollEnd = (e: any) => {
     const contentOffsetX = e.nativeEvent.contentOffset.x;
-    // 修复索引计算：使用四舍五入代替向下取整
     const newIndex = Math.round(contentOffsetX / SCREEN_WIDTH);
     setCurrentChapterIndex(newIndex);
  
-    // 预加载下下章
+    // 预加载后续两章
     const nextChapter = newIndex + 2;
     if (hasMoreChapters && !chapters[nextChapter - 1]) {
       fetchChapter(nextChapter);
     }
+ 
+    // 预加载前一章（确保有缓存）
+    const prevChapter = newIndex;
+    if (prevChapter > 0 && !chapters[prevChapter - 1]) {
+      fetchChapter(prevChapter);
+    }
   };
+ 
+  // 滚动到初始章节
+  useEffect(() => {
+    if (chapters.length > currentChapterIndex) {
+      flatListRef.current?.scrollToIndex({
+        index: currentChapterIndex,
+        animated: false,
+      });
+    }
+  }, [chapters.length]);
  
   if (pendingRequests > 0 && !chapters.length) {
     return (
@@ -100,6 +140,13 @@ export default function BookReaderScreen() {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
+        initialScrollIndex={currentChapterIndex}
+        onScrollToIndexFailed={({ index }) => {
+          flatListRef.current?.scrollToOffset({
+            offset: index * SCREEN_WIDTH,
+            animated: false
+          });
+        }}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],
           { useNativeDriver: false }

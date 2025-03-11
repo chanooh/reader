@@ -62,27 +62,27 @@ export default function UserScreen() {
     <View style={styles.container}>
       {/* 个人信息卡片 */}
       <View style={styles.profileCard}>
-        <Link href="/edit" asChild>
+        {/* <Link href="/edit" asChild> */}
           <TouchableOpacity style={styles.avatarContainer}>
             <Image 
-              source={{ uri: user?.avatar_url || 'https://via.placeholder.com/100' }} 
+              source={{ uri: user?.avatar_url || 'https://pic1.zhimg.com/v2-abed1a8c04700ba7d72b45195223e0ff_l.jpeg' }} 
               style={styles.avatar}
             />
-            <View style={styles.avatarEditBadge}>
+            {/* <View style={styles.avatarEditBadge}>
               <Ionicons name="camera" size={16} color="white" />
-            </View>
+            </View> */}
           </TouchableOpacity>
-        </Link>
+        {/* </Link> */}
         
         <View style={styles.profileDetails}>
           <Text style={styles.name}>{user?.username || '未命名用户'}</Text>
         </View>
  
-        <Link href="/edit" asChild>
+        {/* <Link href="/edit" asChild>
           <TouchableOpacity style={styles.editButton}>
             <Ionicons name="pencil" size={22} color="#4A90E2" />
           </TouchableOpacity>
-        </Link>
+        </Link> */}
       </View>
  
       {/* 功能列表 */}

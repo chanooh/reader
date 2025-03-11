@@ -58,6 +58,7 @@ function RootLayoutNav() {
         <Stack.Screen name="collection" options={{ headerShown: false }}/>
         <Stack.Screen name="login" options={{ headerShown: false }}/>
         <Stack.Screen name="register" options={{ headerShown: false }}/>
+        <Stack.Screen name="edit" options={{ headerShown: true, title: '修改密码' }}/>
       </Stack>
     </ThemeProvider>
   );

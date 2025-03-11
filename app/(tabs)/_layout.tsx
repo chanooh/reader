@@ -32,20 +32,20 @@ export default function TabLayout() {
         options={{
           title: '书城',
           tabBarIcon: ({ color }) => <TabBarIcon name="navicon" color={color} />,
-          headerRight: () => (
-            <Link href="/login" asChild>
-              <Pressable>
-                {({ pressed }) => (
-                  <FontAwesome
-                    name="sliders"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
-          ),
+          // headerRight: () => (
+          //   <Link href="/login" asChild>
+          //     <Pressable>
+          //       {({ pressed }) => (
+          //         <FontAwesome
+          //           name="sliders"
+          //           size={25}
+          //           color={Colors[colorScheme ?? 'light'].text}
+          //           style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
+          //         />
+          //       )}
+          //     </Pressable>
+          //   </Link>
+          // ),
         }}
       />
       <Tabs.Screen

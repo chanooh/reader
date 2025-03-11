@@ -16,6 +16,7 @@ interface Book {
   title: string;
   author: string;
   cover: string;
+  currentChapter:number;
   progress: number;
 }
  
@@ -119,7 +120,7 @@ export default function BookScreen() {
             <Link
               href={{
                 pathname: '/reader',
-                params: { bookId: item.bookId }
+                params: { bookId: item.bookId, chapterNumber:item.currentChapter }
               }}
               asChild
             >

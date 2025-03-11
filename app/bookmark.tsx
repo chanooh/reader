@@ -16,11 +16,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 interface Bookmark {
   bookmark_id: string;
   book_id: string;
-  chapter_id: string;
-  created_at: string;
+  chapter_number: number;
   book_title: string;
-  chapter_title: string;
   cover_url: string;
+  author: string;
+  chapter_title: string;
+  created_at: string;
 }
 
 export default function BookmarkScreen() {
@@ -31,35 +32,45 @@ export default function BookmarkScreen() {
   const fetchBookmarks = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
+      
       const token = await AsyncStorage.getItem('token');
-      if (!token) return;
+      if (!token) {
+        Alert.alert('提示', '请先登录');
+        return;
+      }
 
-      const response = await fetch('http://127.0.0.1:3000/bookmarks', {
+      const response = await fetch('http://192.168.111.30:3000/api/bookmarks', {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (!response.ok) throw new Error('获取书签失败');
+      if (!response.ok) throw new Error(`请求失败：${response.status}`);
+      
       const data = await response.json();
       setBookmarks(data);
     } catch (err: any) {
       setError(err.message);
+      Alert.alert('错误', '获取书签失败');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const deleteBookmark = async (bookmarkId: string) => {
+  const handleDelete = async (bookmarkId: string) => {
     try {
       const token = await AsyncStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch(`http://127.0.0.1:3000/bookmarks/${bookmarkId}`, {
+      const response = await fetch(`http://192.168.111.30:3000/api/bookmarks/${bookmarkId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
 
       if (!response.ok) throw new Error('删除失败');
-      setBookmarks(prev => prev.filter(b => b.bookmark_id !== bookmarkId));
+      
+      setBookmarks(prev => 
+        prev.filter(b => b.bookmark_id !== bookmarkId)
+      );
       Alert.alert('成功', '书签已删除');
     } catch (error) {
       Alert.alert('错误', '删除失败，请重试');
@@ -70,7 +81,28 @@ export default function BookmarkScreen() {
     fetchBookmarks();
   }, []));
 
-  // ...保持加载和错误状态渲染不变
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>加载书签中...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={fetchBookmarks}
+        >
+          <Text style={styles.retryText}>点击重试</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -78,35 +110,51 @@ export default function BookmarkScreen() {
         data={bookmarks}
         keyExtractor={item => item.bookmark_id}
         renderItem={({ item }) => (
-          <View style={styles.bookmarkCard}>
+          <View style={styles.card}>
             <Link
               href={{
                 pathname: '/reader',
                 params: { 
                   bookId: item.book_id,
-                  chapterId: item.chapter_id
+                  // chapterNumber: item.chapter_number.toString()
+                  chapterNumber: item.chapter_number
                 }
               }}
               asChild
             >
-              <TouchableOpacity style={styles.content}>
+              <TouchableOpacity style={styles.bookContent}>
                 <Image
                   source={{ uri: item.cover_url }}
                   style={styles.cover}
                 />
                 <View style={styles.info}>
-                  <Text style={styles.bookTitle}>{item.book_title}</Text>
-                  <Text style={styles.chapterTitle}>{item.chapter_title}</Text>
-                  {/* <Text style={styles.time}>
+                  <Text style={styles.bookTitle} numberOfLines={1}>
+                    {item.book_title}
+                  </Text>
+                  <Text style={styles.author}>{item.author}</Text>
+                  
+                  <View style={styles.chapterInfo}>
+                    <Text style={styles.chapterNumber}>
+                      第 {item.chapter_number} 章
+                    </Text>
+                    <Text 
+                      style={styles.chapterTitle}
+                      numberOfLines={1}
+                    >
+                      {item.chapter_title}
+                    </Text>
+                  </View>
+{/* 
+                  <Text style={styles.time}>
                     {dayjs(item.created_at).format('YYYY-MM-DD HH:mm')}
                   </Text> */}
                 </View>
               </TouchableOpacity>
             </Link>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.deleteButton}
-              onPress={() => deleteBookmark(item.bookmark_id)}
+              onPress={() => handleDelete(item.bookmark_id)}
             >
               <Text style={styles.deleteText}>删除</Text>
             </TouchableOpacity>
@@ -114,56 +162,79 @@ export default function BookmarkScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyText}>暂无书签记录</Text>
-            <Text style={styles.emptyHint}>在章节页面长按添加书签</Text>
+            <Text style={styles.emptyText}>还没有任何书签哦</Text>
+            <Text style={styles.emptyHint}>在章节内长按文本添加书签</Text>
           </View>
         }
+        contentContainerStyle={styles.listContent}
       />
     </View>
   );
 }
 
-// 样式表调整
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  listContent: {
     padding: 16,
   },
-  bookmarkCard: {
+  card: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    backgroundColor: 'white',
+    borderRadius: 12,
     marginBottom: 12,
     padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     elevation: 2,
   },
-  content: {
+  bookContent: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
   },
   cover: {
-    width: 50,
-    height: 70,
-    borderRadius: 4,
+    width: 60,
+    height: 80,
+    borderRadius: 6,
     marginRight: 12,
   },
   info: {
     flex: 1,
+    justifyContent: 'space-between',
   },
   bookTitle: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4,
+    color: '#333',
+  },
+  author: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 4,
+  },
+  chapterInfo: {
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  chapterNumber: {
+    fontSize: 14,
+    color: '#007AFF',
+    marginRight: 8,
   },
   chapterTitle: {
+    flex: 1,
     fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
+    color: '#444',
   },
   time: {
     fontSize: 12,
     color: '#999',
+    marginTop: 6,
   },
   deleteButton: {
     justifyContent: 'center',
@@ -173,9 +244,47 @@ const styles = StyleSheet.create({
     color: '#ff4444',
     fontWeight: '500',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 8,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: '#ff4444',
+    fontSize: 16,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  retryButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#007AFF',
+    borderRadius: 25,
+  },
+  retryText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
+  },
   empty: {
     alignItems: 'center',
-    marginTop: 40,
+    marginTop: 60,
+  },
+  emptyImage: {
+    width: 120,
+    height: 120,
+    opacity: 0.8,
+    marginBottom: 16,
   },
   emptyText: {
     fontSize: 16,
