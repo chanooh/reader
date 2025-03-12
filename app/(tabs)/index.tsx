@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { Link } from 'expo-router';
- 
+import { config } from "@/constants/ApiConfig";
 interface Book {
   bookId: string;
   title: string;
@@ -34,8 +34,8 @@ export default function HomeScreen() {
       try {
         // 并行请求两个接口
         const [recommendationsRes, categoriesRes] = await Promise.all([
-          fetch('http://192.168.111.30:3000/api/recommendations'),
-          fetch('http://192.168.111.30:3000/api/categories')
+          fetch(`${config.API_BASE}/api/recommendations`),
+          fetch(`${config.API_BASE}/api/categories`)
         ]);
  
         // 处理推荐数据

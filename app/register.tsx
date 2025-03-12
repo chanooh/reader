@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Text, View } from '@/components/Themed';
 import { Link, useRouter } from 'expo-router';
+import { config } from "@/constants/ApiConfig";
 // import { useAuth } from '@/context/AuthContext';
 export default function RegisterScreen() {
   const [password, setPassword] = useState('');
@@ -22,7 +23,7 @@ export default function RegisterScreen() {
     setError('');
 
     try {
-      const response = await fetch('http://192.168.111.30:3000/auth/register', {
+      const response = await fetch(`${config.API_BASE}/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,10 +7,13 @@ import {
   Animated,
   Dimensions,
   FlatList,
-  ActivityIndicator
+  ActivityIndicator,
+  NativeSyntheticEvent,
+  NativeScrollEvent
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
- 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { config } from "@/constants/ApiConfig";
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
  
 interface Chapter {
@@ -27,14 +30,13 @@ export default function BookReaderScreen() {
   const [pendingRequests, setPendingRequests] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
-  const { bookId, chapterNumber: paramChapter } = useLocalSearchParams();
+  const { bookId, chapterNumber: paramChapter, progress } = useLocalSearchParams();
   const initialChapter = paramChapter ? parseInt(paramChapter as string, 10) : null;
- 
+  const [readChapters, setReadChapters] = useState(0);
   // 初始化章节状态
   useEffect(() => {
     if (initialChapter) {
       setCurrentChapterIndex(initialChapter - 1);
-      // 预初始化数组长度确保能滚动到指定位置
       setChapters(prev => [...prev, ...Array(initialChapter - prev.length).fill(undefined)]);
     }
   }, [initialChapter]);
@@ -45,7 +47,7 @@ export default function BookReaderScreen() {
     try {
       setPendingRequests(prev => prev + 1);
       const response = await fetch(
-        `http://192.168.111.30:3000/bookcontent?bookId=${bookId}&chapter=${chapterNumber}`
+        `${config.API_BASE}/bookcontent?bookId=${bookId}&chapter=${chapterNumber}`
       );
       const data = await response.json();
  
@@ -65,7 +67,42 @@ export default function BookReaderScreen() {
       setPendingRequests(prev => prev - 1);
     }
   };
+
+  // 滚动处理函数
+  const handleChapterScroll = useCallback((chapterIndex: number) => {
+    return async (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+      const scrollY = contentOffset.y;
+      const contentHeight = contentSize.height;
+      const viewportHeight = layoutMeasurement.height;
+      
+  
+      if (contentHeight > 0 && (scrollY + viewportHeight) / contentHeight >= 0.8) {
+        // console.log(chapterIndex)
+        if (chapterIndex+1>readChapters) {
+          const token = await AsyncStorage.getItem('token');
+          fetch(`${config.API_BASE}/api/reading-progress`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              book_id: Number(bookId),
+              current_chapter: chapterIndex+1
+            })
+          });
+
+
+          setReadChapters(chapterIndex+1)
+
+
+        }
+      }
+    };
+  }, [readChapters, chapters]);
  
+  
   // 初始加载逻辑
   useEffect(() => {
     if (!bookId) return;
@@ -165,6 +202,9 @@ export default function BookReaderScreen() {
                   {item.title}
                 </Text>
                 <FlatList
+                  onScroll={handleChapterScroll(index)}
+                  scrollEventThrottle={100}
+                  persistentScrollbar={true}
                   data={item.paragraphs}
                   keyExtractor={(_, i) => `para-${index}-${i}`}
                   showsVerticalScrollIndicator={false}

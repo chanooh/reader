@@ -10,6 +10,7 @@ import {
 import { Text, View } from '@/components/Themed';
 import { Link, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { config } from "@/constants/ApiConfig";
 interface Book {
   bookId: string;
   title: string;
@@ -41,7 +42,7 @@ export default function CollectionScreen() {
         if (!token) return;
  
         const response = await fetch(
-          `http://192.168.111.30:3000/api/collections/${collectionId}/books`,
+          `${config.API_BASE}/api/collections/${collectionId}/books`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -69,7 +70,7 @@ export default function CollectionScreen() {
     try {
       const endpoint = currentStatus === 1 ? 'remove' : 'add';
       const response = await fetch(
-        `http://192.168.111.30:3000/api/user_books/${bookId}`,
+        `${config.API_BASE}/api/user_books/${bookId}`,
         {
           method: currentStatus === 1 ? 'DELETE' : 'POST',
           headers: {

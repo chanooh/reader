@@ -10,7 +10,7 @@ import {
 import { Text, View } from '@/components/Themed';
 import { Link, useRouter,useFocusEffect  } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
- 
+import { config } from "@/constants/ApiConfig";
 interface Book {
   bookId: string;
   title: string;
@@ -38,7 +38,7 @@ export default function BookScreen() {
       }
  
       const response = await fetch(
-        'http://192.168.111.30:3000/api/user_books',
+        `${config.API_BASE}/api/user_books`,
         { headers: { Authorization: `Bearer ${storedToken}` } }
       );
  
@@ -73,7 +73,7 @@ export default function BookScreen() {
       if (!storedToken) return;
  
       const response = await fetch(
-        `http://192.168.111.30:3000/api/user_books/${bookId}`,
+        `${config.API_BASE}/api/user_books/${bookId}`,
         { method: 'DELETE', headers: { Authorization: `Bearer ${storedToken}`, } }
       );
  

@@ -11,7 +11,7 @@ import { Text, View } from '@/components/Themed';
 import { Link, useRouter } from 'expo-router';
 // import { useAuth } from '@/context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { config } from "@/constants/ApiConfig";
 interface User {
   id: string;
   username: string;
@@ -36,7 +36,7 @@ export default function LoginScreen() {
     setError('');
     
     try {
-      const response = await fetch('http://192.168.111.30:3000/auth/login', {
+      const response = await fetch(`${config.API_BASE}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -55,7 +55,7 @@ export default function LoginScreen() {
       await AsyncStorage.setItem('token', token);
 
 
-      const userDataResponse = await fetch('http://192.168.111.30:3000/api/me', {
+      const userDataResponse = await fetch(`${config.API_BASE}/api/me`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const userData = await userDataResponse.json();

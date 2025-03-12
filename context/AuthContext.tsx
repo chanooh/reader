@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUser = useCallback(async (token: string) => {
     try {
-      const response = await fetch('http://127.0.0.1/api/me', {
+      const response = await fetch('http://127.0.0.1:3000/api/me', {
         headers: { Authorization: `Bearer ${token}` }
       });
       

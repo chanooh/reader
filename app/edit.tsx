@@ -3,7 +3,7 @@ import { Platform, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator } 
 import React, { useState } from 'react';
 import { View, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { config } from "@/constants/ApiConfig";
 export default function EditScreen() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -35,7 +35,7 @@ export default function EditScreen() {
       setSuccess('');
       
       const token = await AsyncStorage.getItem('token');
-      const response = await fetch('http://127.0.0.1:3000/change-password', {
+      const response = await fetch(`${config.API_BASE}/change-password`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -12,7 +12,7 @@ import { Text, View } from '@/components/Themed';
 import { Link, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 // import dayjs from 'dayjs';
-
+import { config } from "@/constants/ApiConfig";
 interface Bookmark {
   bookmark_id: string;
   book_id: string;
@@ -40,7 +40,7 @@ export default function BookmarkScreen() {
         return;
       }
 
-      const response = await fetch('http://192.168.111.30:3000/api/bookmarks', {
+      const response = await fetch(`${config.API_BASE}/api/bookmarks`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -61,7 +61,7 @@ export default function BookmarkScreen() {
       const token = await AsyncStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch(`http://192.168.111.30:3000/api/bookmarks/${bookmarkId}`, {
+      const response = await fetch(`${config.API_BASE}/api/bookmarks/${bookmarkId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
