@@ -11,16 +11,46 @@ import {
 import { Text, View } from '@/components/Themed';
 import { Link } from 'expo-router';
 import { config } from "@/constants/ApiConfig";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 interface Book {
   bookId: string;
   title: string;
   author: string;
   cover: string;
+  progress: number;
+  totalChapters: number;
+  status: 0 | 1;
 }
  
 interface Category {
   collectionId: string;
   name: string;
+}
+
+function useDebounce<T extends (...args: any[]) => void>(
+  func: T,
+  delay: number
+): (...args: Parameters<T>) => void {
+  const timerRef = React.useRef<NodeJS.Timeout>();
+ 
+  // 清理定时器
+  React.useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
+ 
+  return (...args: Parameters<T>) => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    timerRef.current = setTimeout(() => {
+      func(...args);
+    }, delay);
+  };
 }
  
 export default function HomeScreen() {
@@ -28,6 +58,93 @@ export default function HomeScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Book[]>([]);
+  const [loadingSearch, setLoadingSearch] = useState(false);
+
+  const [errorSearch, setErrorSearch] = useState<string | null>(null);
+
+  const debouncedSearch = useDebounce(async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return;
+    }
+ 
+    try {
+      setLoadingSearch(true);
+      const token = await AsyncStorage.getItem('token')
+      const response = await fetch(
+        `${config.API_BASE}/api/search?keyword=${encodeURIComponent(query)}`,{
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      const data = await response.json();
+      setSearchResults(data);
+    } catch (error) {
+      Alert.alert('搜索失败', '请检查网络连接');
+    } finally {
+      setLoadingSearch(false);
+    }
+  }, 500); // 500ms防抖间隔
+
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+    debouncedSearch(text);
+  };
+
+  const renderSearchResults = () => {
+    if (!searchQuery) return null;
+ 
+    if (loadingSearch) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color="#007AFF" />
+        </View>
+      );
+    }
+ 
+    if (errorSearch) {
+      return (
+        <Text style={styles.errorText}>搜索失败：{errorSearch}</Text>
+      );
+    }
+ 
+    return (
+      <FlatList
+        data={searchResults}
+        keyExtractor={(item) => item.bookId}
+        renderItem={({ item }) => (
+          <Link
+            href={{
+              pathname: '/reader',
+              params: { bookId: item.bookId }
+            }}
+            asChild
+          >
+            <TouchableOpacity style={styles.searchItem}>
+              <Image 
+                source={{ uri: item.cover }} 
+                style={styles.searchCover}
+              />
+              <View style={styles.searchInfo}>
+                <Text style={styles.searchTitle}>{item.title}</Text>
+                <Text style={styles.searchAuthor}>{item.author}</Text>
+                <View style={styles.progressContainer}>
+                  <Text style={styles.progressText}>
+                    {item.status === 1 ? '已收藏' : '未收藏'} · 
+                    阅读进度 {(item.progress * 100).toFixed(0)}%
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </Link>
+        )}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>没有找到相关书籍</Text>
+        }
+      />
+    );
+  };
  
   useEffect(() => {
     const fetchData = async () => {
@@ -82,8 +199,14 @@ export default function HomeScreen() {
         style={styles.searchBox}
         placeholder="搜索书籍..."
         placeholderTextColor="#999"
+        value={searchQuery}
+        onChangeText={handleSearchChange}
       />
- 
+
+      {searchQuery ? (
+        renderSearchResults()
+      ) : (
+        <>
       {/* 每日推荐书籍卡片 */}
       <Text style={styles.sectionTitle}>📚 每日推荐</Text>
       <FlatList
@@ -140,6 +263,10 @@ export default function HomeScreen() {
         contentContainerStyle={styles.categoryList}
         ListEmptyComponent={<Text style={styles.emptyText}>暂无分类信息</Text>}
       />
+        </>
+      )}
+ 
+
     </View>
   );
 }
@@ -264,5 +391,47 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 8,
     overflow: 'hidden'
-  }
+  },
+  // searchBox: {
+  //   height: 40,
+  //   margin: 16,
+  //   paddingHorizontal: 12,
+  //   borderRadius: 8,
+  //   backgroundColor: '#fff',
+  //   fontSize: 16,
+  // },
+  searchItem: {
+    flexDirection: 'row',
+    padding: 12,
+    backgroundColor: '#fff',
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 8,
+  },
+  searchCover: {
+    width: 60,
+    height: 80,
+    borderRadius: 4,
+  },
+  searchInfo: {
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'space-between',
+  },
+  searchTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  searchAuthor: {
+    fontSize: 14,
+    color: '#666',
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  progressText: {
+    fontSize: 12,
+    color: '#888',
+  },
 });
