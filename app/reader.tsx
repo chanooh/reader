@@ -9,7 +9,8 @@ import {
   FlatList,
   ActivityIndicator,
   NativeSyntheticEvent,
-  NativeScrollEvent
+  NativeScrollEvent,
+  Alert
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -30,9 +31,28 @@ export default function BookReaderScreen() {
   const [pendingRequests, setPendingRequests] = useState(0);
   const flatListRef = useRef<FlatList>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
-  const { bookId, chapterNumber: paramChapter, progress } = useLocalSearchParams();
+  const { bookId, chapterNumber: paramChapter, totalChapters } = useLocalSearchParams();
   const initialChapter = paramChapter ? parseInt(paramChapter as string, 10) : null;
   const [readChapters, setReadChapters] = useState(0);
+  const menuAnimation = useRef(new Animated.Value(0)).current;
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [fontSize, setFontSize] = useState(16);
+  const MIN_FONT_SIZE = 12;
+  const MAX_FONT_SIZE = 24;
+
+  const toggleMenu = () => {
+    Animated.timing(menuAnimation, {
+      toValue: isMenuOpen ? 0 : 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+    setIsMenuOpen(!isMenuOpen);
+  };
+ 
+  const menuTranslateY = menuAnimation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-20, 0]
+  });
   // 初始化章节状态
   useEffect(() => {
     if (initialChapter) {
@@ -101,6 +121,56 @@ export default function BookReaderScreen() {
       }
     };
   }, [readChapters, chapters]);
+  const adjustFontSize = (size: number) => {
+    setFontSize(Math.max(MIN_FONT_SIZE, Math.min(MAX_FONT_SIZE, size)));
+  };
+
+  const handleAddBookmark = async () => {
+    try {
+      const currentChapter = chapters[currentChapterIndex];
+      if (!currentChapter) {
+        Alert.alert('提示', '章节内容尚未加载完成');
+        return;
+      }
+ 
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        Alert.alert('未登录', '请先登录后再添加书签');
+        return;
+      }
+ 
+      const response = await fetch(`${config.API_BASE}/api/bookmarks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          book_id: Number(bookId),
+          chapter_number: currentChapterIndex+1
+      })
+      });
+ 
+      const result = await response.json();
+      
+      if (response.status === 409) {
+        Alert.alert('提示', '该书签已存在');
+        return;
+      }
+ 
+      if (!response.ok) {
+        throw new Error(result.error || '添加书签失败');
+      }
+ 
+      Alert.alert('成功', '书签添加成功');
+    } catch (error) {
+      console.error('书签添加失败:', error);
+      Alert.alert('错误', '添加书签失败，请稍后重试');
+    }
+  };
+
+  const increaseFontSize = () => setFontSize(prev => Math.min(MAX_FONT_SIZE, prev + 2));
+  const decreaseFontSize = () => setFontSize(prev => Math.max(MIN_FONT_SIZE, prev - 2))
  
   
   // 初始加载逻辑
@@ -161,15 +231,58 @@ export default function BookReaderScreen() {
  
   return (
     <View style={[styles.container, nightMode && styles.nightContainer]}>
-      <View style={[styles.header, { zIndex: 10 }]}>
-        <TouchableOpacity onPress={() => {}}>
-          <Text style={[styles.icon, styles.bookmarked]}>🔖</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setNightMode((prev) => !prev)}>
-          <Text style={styles.icon}>{nightMode ? '🌞' : '🌙'}</Text>
-        </TouchableOpacity>
-      </View>
+      {/* 菜单触发按钮 */}
+      <TouchableOpacity 
+        style={styles.menuTrigger}
+        onPress={toggleMenu}
+        activeOpacity={0.7}>
+        <Text style={[styles.menuIcon, nightMode && styles.nightText]}>
+          {isMenuOpen ? '×' : '⋮'}
+        </Text>
+      </TouchableOpacity>
  
+      {/* 折叠菜单 */}
+      <Animated.View 
+        style={[
+          styles.menuContainer,
+          nightMode && styles.nightMenu,
+          {
+            opacity: menuAnimation,
+            transform: [{ translateY: menuTranslateY }]
+          }
+        ]}>
+        {/* 字体控制 */}
+        <View style={styles.menuGroup}>
+          <TouchableOpacity
+            onPress={() => adjustFontSize(fontSize - 2)}
+            style={styles.menuButton}>
+            <Text style={[styles.menuText, nightMode && styles.nightText]}>A-</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => adjustFontSize(fontSize + 2)}
+            style={styles.menuButton}>
+            <Text style={[styles.menuText, nightMode && styles.nightText]}>A+</Text>
+          </TouchableOpacity>
+        </View>
+ 
+        {/* 功能按钮 */}
+        <View style={styles.menuGroup}>
+          <TouchableOpacity
+            onPress={handleAddBookmark}
+            style={styles.menuButton}>
+            <Text style={[styles.menuText, nightMode && styles.nightText]}>⭐</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setNightMode(!nightMode)}
+            style={styles.menuButton}>
+            <Text style={[styles.menuText, nightMode && styles.nightText]}>
+              {nightMode ? '🌞' : '🌙'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+ 
+      {/* 内容区域 */}
       <FlatList
         ref={flatListRef}
         data={chapters}
@@ -204,13 +317,16 @@ export default function BookReaderScreen() {
                 <FlatList
                   onScroll={handleChapterScroll(index)}
                   scrollEventThrottle={100}
-                  persistentScrollbar={true}
                   data={item.paragraphs}
                   keyExtractor={(_, i) => `para-${index}-${i}`}
                   showsVerticalScrollIndicator={false}
                   style={styles.chapterContent}
                   renderItem={({ item: paragraph }) => (
-                    <Text style={[styles.contentText, nightMode && styles.nightText]}>
+                    <Text style={[
+                      styles.contentText, 
+                      nightMode && styles.nightText,
+                      { fontSize }
+                    ]}>
                       {paragraph}
                     </Text>
                   )}
@@ -227,7 +343,6 @@ export default function BookReaderScreen() {
     </View>
   );
 }
- 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -240,50 +355,75 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  header: {
+  menuTrigger: {
     position: 'absolute',
-    top: 5,
-
-    right: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 10,
+    top: 0,
+    right: 20,
+    zIndex: 101,
+    padding: 12,
+    // backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
-  link: {
+  menuIcon: {
+    fontSize: 24,
+    color: '#333',
+  },
+  menuContainer: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    zIndex: 100,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: 16,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  nightMenu: {
+    backgroundColor: 'rgba(0,0,0,0.9)',
+  },
+  menuGroup: {
+    marginVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    paddingBottom: 8,
+    alignItems: 'center',
+  },
+  menuButton: {
+    padding: 8,
+    marginVertical: 4,
+  },
+  menuText: {
     fontSize: 20,
-    color: '#4A90E2',
+    color: '#333',
+  },
+  pageContainer: {
+    width: SCREEN_WIDTH,
+    paddingHorizontal: 20,
+    paddingTop: 10,
   },
   chapterTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 16,
     color: '#333',
   },
   chapterContent: {
     flex: 1,
   },
   contentText: {
-    fontSize: 16,
-    lineHeight: 24,
+    marginBottom: 16,
+    lineHeight: 36,
     color: '#333',
-    marginBottom: 10,
   },
   nightText: {
     color: '#fff',
   },
-  pageContainer: {
-    width: SCREEN_WIDTH,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  icon: {
-    fontSize: 24,
-    color: '#000',
-  },
-  bookmarked: {
-    color: '#FFD700',
-  },
-  
 });
-
